@@ -1,0 +1,235 @@
+{% extends 'layout.html' %}
+
+{% block title %}Filter Results{% endblock %}
+
+{% block content %}
+
+
+    {% if from_search %}
+        <h1 class="display-5 mb-4">Search Results</h1>
+        <h5 class="display-5 mb-4">The following plants match your search criteria</h5>
+    {% else %}
+<div class="container-xxl py-5">
+  <div class="container">
+    <div class="card mb-4">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">Your Filter Criteria</h5>
+        {% if session['ID'] %}
+        <button id="saveFilterBtn" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#saveFilterModal">Save Filter</button>
+        {% endif %}
+      </div>
+      {% if weight_dict %}
+      <div class="card-body">
+        <div class="row">
+          {% for category, weight in weight_dict.items() %}
+          <div class="col-md-4 mb-3">
+            <strong>{{ category }}:</strong> {{ weight }}
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    {% else %}
+      <div class="card-body">
+        <p>No filter criteria found.</p>
+      </div>
+    {% endif %}
+    </div>
+    <div class="d-flex justify-content-end mb-4">
+      <a href="#" class="btn btn-success" id="download-excel-btn">
+          <i class="bi bi-download"></i> Download Excel
+      </a>
+    </div>
+    <form id="download-excel-form" action="{{ url_for('main.download_filtered_excel') }}" method="GET" style="display: none;"></form>
+
+      <h1 class="display-5 mb-4">Filter Results</h1>
+      <h5 class="display-5 mb-4">The top 20 plants that best match your filtering criteria</h5>
+    {% endif %}
+    <div class="row row-cols-1 row-cols-md-3 g-5">
+      {% for plant in detailed_plants %}
+          <div class="col">
+              <!-- Entire card clickable for plant detail -->
+              <a href="{{ url_for('main.plant_detail', plant_id=plant.ID) }}" class="text-decoration-none text-dark">
+                <div class="card h-100 d-flex flex-column justify-content-between" style="position: relative;">
+                    {% if plant.Image %}
+                        <img src="{{ url_for('static', filename='img/' + plant.Image) }}" class="card-img-top" alt="{{ plant.BotanicalName }}" style="height: 200px; object-fit: cover;">
+                    {% else %}
+                        <img src="{{ url_for('static', filename='img/no_img_available.jpg') }}" class="card-img-top" alt="No image available" style="height: 200px; object-fit: cover;">
+                    {% endif %}
+                    <div class="card-body" style="display: flex; justify-content: space-between;">
+                      <div class="text-content">
+                        {% if not from_search %}
+                          <h5 class="card-title">No.{{ loop.index }} {{ plant.BotanicalName }}</h5>
+                        {% else %}
+                          <h5 class="card-title">{{ plant.BotanicalName }}</h5>
+                        {% endif %}
+                          <p class="card-text">{{ plant.CommonName }}</p>
+                          <p class="card-text"><small class="text-muted">Family: {{ plant.Family }}</small></p>
+                      </div>
+    
+                      <!-- Only show progress circle and details button when not from_search -->
+                      {% if not from_search %}
+                      <div class="progress-circle" data-percentage="{{ plant.Percentage|round(2) }}">
+                        <div class="circle">
+                          <div class="inset">
+                            <span>{{ plant.Percentage|round(2) }}%</span>
+                          </div>
+                        </div>
+                      </div>
+                      {% endif %}
+                    </div>
+                </div>
+              </a>
+    
+              <!-- Only show the button if not from_search -->
+              {% if not from_search %}
+              <div class="mt-0">
+                  <button class="btn btn-info btn-sm w-100" data-bs-toggle="modal" data-bs-target="#calculationModal{{ plant.ID }}">View Calculation Details</button>
+              </div>
+              {% endif %}
+          </div>
+    
+          <!-- Modal for displaying calculation details -->
+          <div class="modal fade" id="calculationModal{{ plant.ID }}" tabindex="-1" aria-labelledby="calculationModalLabel{{ plant.ID }}" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+              <div class="modal-content">
+                <div class="modal-header">
+                  <h5 class="modal-title" id="calculationModalLabel{{ plant.ID }}">Calculation Details for {{ plant.BotanicalName }}</h5>
+                  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                  {% if not from_search %}
+                  <p><strong>Calculation Details:</strong></p>
+                  <p>Total Score: {{ plant.Score }}</p>
+                  <p>Maximum Possible Score: {{ plant.max_scores }}</p>
+                  <p>Final Percentage: {{ plant.Percentage|round(2) }}%</p>
+    
+                  <hr>
+                  {% endif %}
+                  <!-- Detailed explanation of the calculation -->
+                  <p>The percentage shown represents how closely this plant matches the criteria you have set. Here's how the calculation works:</p>
+                  
+                  <h6>1. Total Score:</h6>
+                  <p>The total score of this plant is calculated by considering different attributes such as palatability, growth rate, conservation threat status, and more. For each attribute, the plant is given a score based on its characteristics. This score is then adjusted according to the importance (weight) you assigned to that attribute during filtering. The higher the attribute's weight, the more it contributes to the plant's total score.</p>
+                  
+                  <h6>2. Maximum Possible Score:</h6>
+                  <p>The maximum possible score is the theoretical highest score this plant could achieve if it performed perfectly across all attributes. This is calculated by multiplying the maximum possible value for each attribute by the corresponding weight. This gives us a benchmark for what an ideal plant would score based on your criteria.</p>
+    
+                  <h6>3. Final Percentage:</h6>
+                  <p>The final percentage is calculated by dividing the plant's total score by the maximum possible score, and then multiplying the result by 100 to convert it into a percentage. This percentage tells you how well the plant matches your filter settings in comparison to the best possible plant.</p>
+                  
+                  <p>For example, if a plant's total score is 75 and the maximum possible score is 100, the plant's percentage match would be 75%. This means the plant meets 75% of the criteria you have set based on the weights and attributes considered.</p>
+    
+                  <p>This helps you compare how well different plants align with your preferences and select the one that fits best.</p>
+                </div>
+                <div class="modal-footer">
+                  <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+              </div>
+            </div>
+          </div>
+    
+      {% endfor %}
+    </div>    
+</div>
+</div>
+
+<!-- Save Filter Modal -->
+<div class="modal fade" id="saveFilterModal" tabindex="-1" aria-labelledby="saveFilterModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="saveFilterModalLabel">Save Filter Criteria</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form id="saveFilterForm">
+          <div class="mb-3">
+            <label for="filterName" class="form-label">Filter Name</label>
+            <input type="text" class="form-control" id="filterName" placeholder="Enter a name for your filter">
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-primary" id="saveFilterAction">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.querySelectorAll('.progress-circle').forEach(function(circle) {
+  const percentage = circle.getAttribute('data-percentage');
+  circle.style.setProperty('--percentage', percentage);
+});
+
+
+document.getElementById('saveFilterAction').addEventListener('click', function() {
+    const filterName = document.getElementById('filterName').value;    
+    const weightDict = {{ weight_dict | tojson }};
+
+    if (!filterName) {
+        alert("Please provide a name for your filter.");
+        return;
+    }
+
+    fetch("{{ url_for('user.save_filter') }}", {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            filterName: filterName,
+            weightDict: weightDict
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Filter saved successfully!');
+            location.reload(); 
+        } else {
+            alert('Failed to save filter: ' + data.message);
+        }
+    })
+    .catch(error => console.error('Error:', error));
+});
+
+
+</script>
+
+<script type="text/javascript">
+  document.getElementById("download-excel-btn").addEventListener("click", function(event){
+      event.preventDefault(); 
+      var userConfirmed = confirm("Are you sure you want to download the filtered results as an Excel file?");
+      if (userConfirmed) {
+          document.getElementById("download-excel-form").submit(); 
+      }
+  });
+</script>
+
+
+{% endblock %}
+<html xmlns:mso="urn:schemas-microsoft-com:office:office" xmlns:msdt="uuid:C2F41010-65B3-11d1-A29F-00AA00C14882"><head>
+<!--[if gte mso 9]><xml>
+<mso:CustomDocumentProperties>
+<mso:xd_Signature msdt:dt="string"></mso:xd_Signature>
+<mso:display_urn_x003a_schemas-microsoft-com_x003a_office_x003a_office_x0023_Editor msdt:dt="string">Gao, Dian</mso:display_urn_x003a_schemas-microsoft-com_x003a_office_x003a_office_x0023_Editor>
+<mso:Order msdt:dt="string">18903000.0000000</mso:Order>
+<mso:xd_ProgID msdt:dt="string"></mso:xd_ProgID>
+<mso:_ExtendedDescription msdt:dt="string"></mso:_ExtendedDescription>
+<mso:SharedWithUsers msdt:dt="string"></mso:SharedWithUsers>
+<mso:display_urn_x003a_schemas-microsoft-com_x003a_office_x003a_office_x0023_Author msdt:dt="string">Gao, Dian</mso:display_urn_x003a_schemas-microsoft-com_x003a_office_x003a_office_x0023_Author>
+<mso:ComplianceAssetId msdt:dt="string"></mso:ComplianceAssetId>
+<mso:TemplateUrl msdt:dt="string"></mso:TemplateUrl>
+<mso:TriggerFlowInfo msdt:dt="string"></mso:TriggerFlowInfo>
+<mso:ContentTypeId msdt:dt="string">0x0101002F762B7C5F8C1B44A969538F1EBF5320</mso:ContentTypeId>
+<mso:_SourceUrl msdt:dt="string"></mso:_SourceUrl>
+<mso:_SharedFileIndex msdt:dt="string"></mso:_SharedFileIndex>
+<mso:MediaLengthInSeconds msdt:dt="string"></mso:MediaLengthInSeconds>
+<mso:TaxCatchAll msdt:dt="string"></mso:TaxCatchAll>
+<mso:MediaServiceImageTags msdt:dt="string"></mso:MediaServiceImageTags>
+<mso:lcf76f155ced4ddcb4097134ff3c332f msdt:dt="string"></mso:lcf76f155ced4ddcb4097134ff3c332f>
+</mso:CustomDocumentProperties>
+</xml><![endif]-->
+<title></title></head>
